@@ -7,16 +7,27 @@ import java.util.Map;
 
 import static org.hamcrest.Matchers.*;
 import org.junit.Before;
+import org.junit.FixMethodOrder;
 import org.junit.Test;
+import org.junit.runners.MethodSorters;
+
 import br.com.rest.classeAjudaTodosTeste.BaseTest;
+import br.com.rest.utils.DataUtils;
 import io.restassured.matcher.ResponseAwareMatcher;
 import io.restassured.response.Response;
 
+
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)  /// isso aqui serve para ordenar a ordem do teste
 
 public class BarrigaTest extends BaseTest {
 	
 	private String TOKEN;
 	
+	private static String CONTA_NAME = "Conta " + System.nanoTime(); //deixando como static para não zerar a variavel
+																	 //para deixar o nome diferente utiliza + System.nanoTime();
+	private static Integer CONTA_ID;
+	
+	private static Integer MOV_ID;
 	
 	@Before
 	
@@ -41,7 +52,7 @@ public class BarrigaTest extends BaseTest {
 	
 	@Test
 	
-	public void naoDeveAcessarAPISemToken() {
+	public void t01_naoDeveAcessarAPISemToken() {
 		
 		given()
 		.when()
@@ -55,16 +66,17 @@ public class BarrigaTest extends BaseTest {
 	
 	@Test
 	
-	public void deveIncluirContaComSucesso() {	
+	public void t02_deveIncluirContaComSucesso() {	
 		
-		given()
+		CONTA_ID = given() //AQUI INSERO MINHA VARIAVEL CRIADA PARA POVOAR MEU ID
 		.header("Authorization", "JWT " + TOKEN)
-		  .body("{\"nome\": \"conta qualquer 6\" }")
+		  .body("{\"nome\": \""+CONTA_NAME+"\" }") //USAR O MAP
 		.when()
 			.post("/contas")
 		.then()
 			.statusCode(201)
-			.log().all();
+			.log().all()
+			.extract().path("id"); // nesse ponto estou extraindo o ID e armazendo na variavel CONTA_ID criada logo acima
 	
 
 	}
@@ -72,13 +84,14 @@ public class BarrigaTest extends BaseTest {
 	
 	@Test
 	
-	public void deveAlterarContaComSucesso() {
+	public void t03_deveAlterarContaComSucesso() {
 		
 		given()
 		.header("Authorization", "JWT " + TOKEN)
-		  .body("{\"nome\": \"conta alterada paulo2\" }")
+		  .body("{\"nome\": \""+CONTA_NAME+"alterada\" }")
+		  .pathParam("id", "CONTA_ID") // aqui estou usando o id capturado na inserção
 		.when()
-			.put("/contas/1092609")
+			.put("/contas/{id}") //passando o {id}
 		.then()
 			.log().all()
 			.statusCode(200)
@@ -92,11 +105,11 @@ public class BarrigaTest extends BaseTest {
 	
 	@Test
 	
-	public void naoDeveInserirContaMesmoNome() {
+	public void t04_naoDeveInserirContaMesmoNome() {
 		
 		given()
 		.header("Authorization", "JWT " + TOKEN)
-		  .body("{\"nome\": \"conta alterada paulo2\" }")
+		  .body("{\"nome\": \""+CONTA_NAME+ "alterada\" }")
 		.when()
 			.post("/contas")
 		.then()
@@ -113,20 +126,21 @@ public class BarrigaTest extends BaseTest {
 
 	@Test
 	
-	public void DeveInserirMovimentacaoSucesso() {
+	public void t05_DeveInserirMovimentacaoSucesso() {
 		
 		
 		Movimentacao mov = getMovimentacaoValida();
 		
 		
-		given()
+		MOV_ID = given()
 		.header("Authorization", "JWT " + TOKEN)
 		  .body(mov)
 		.when()
 			.post("/transacoes")
 		.then()
 			.log().all()
-			.statusCode(201);
+			.statusCode(201)
+			.extract().path("id");
 			
 			
 
@@ -135,7 +149,7 @@ public class BarrigaTest extends BaseTest {
 	
 @Test
 	
-	public void deveValidarCamposObrigatóriosMovimentacao() {
+	public void t06_deveValidarCamposObrigatóriosMovimentacao() {
 		
 		
 		given()
@@ -164,11 +178,11 @@ public class BarrigaTest extends BaseTest {
 
 @Test
 
-public void naoDeveInserirMovimentacaoDataFutura() {
+public void t07_naoDeveInserirMovimentacaoDataFutura() {
 	
 	
 	Movimentacao mov = getMovimentacaoValida();
-	mov.setData_transacao("20/05/2030");
+	mov.setData_transacao(DataUtils.getDataDiferencaDias(2)); //aqui eu informo que a data sempre será data atual mas duas pra frente
 	
 	
 	given()
@@ -196,9 +210,33 @@ public void naoDeveInserirMovimentacaoDataFutura() {
 	
 }
 
+
 @Test
 
-public void deveCalcularSaldoContas() {
+public void t08_naoDeveRemoverContaComMovimentacao() {
+	
+	
+	given()
+	.header("Authorization", "JWT " + TOKEN)
+	.pathParam("id", CONTA_ID)
+	.when()
+		.delete("contas/{id}")
+	.then()
+		.log().all()
+		.statusCode(500)
+		.body("constraint", is("transacoes_conta_id_foreign"));
+		
+
+	
+}
+
+
+
+
+
+@Test
+
+public void t09_deveCalcularSaldoContas() {
 	
 	
 	given()
@@ -208,7 +246,7 @@ public void deveCalcularSaldoContas() {
 	.then()
 		.log().all()
 		.statusCode(200)
-		.body("find{it.conta_id == 1092609}.saldo", is("333.00"))
+		.body("find{it.conta_id == "+CONTA_ID+"}.saldo", is("333.00"))
 		.body("find{it.conta_id == 1092609}.conta", is("conta alterada paulo2"));
 		
 
@@ -218,13 +256,14 @@ public void deveCalcularSaldoContas() {
 
 @Test
 
-public void deveRemoverMovimentacao() {
+public void t10_deveRemoverMovimentacao() {
 	
 	
 	given()
 	.header("Authorization", "JWT " + TOKEN)
+	.pathParam("id", MOV_ID)
 	.when()
-		.delete("/transacoes/1040296")
+		.delete("/transacoes/{id}")
 	.then()
 		.log().all()
 		.statusCode(204);
@@ -288,7 +327,7 @@ public void deveRemoverMovimentacao() {
 	
 	
 	
-	
+	//teste ph
 	
 	
 	
@@ -303,3 +342,4 @@ public void deveRemoverMovimentacao() {
 	
 
 }
+ 
