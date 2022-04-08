@@ -7,12 +7,14 @@ import java.util.Map;
 
 import static org.hamcrest.Matchers.*;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
 
 import br.com.rest.classeAjudaTodosTeste.BaseTest;
 import br.com.rest.utils.DataUtils;
+import io.restassured.RestAssured;
 import io.restassured.matcher.ResponseAwareMatcher;
 import io.restassured.response.Response;
 
@@ -29,16 +31,16 @@ public class BarrigaTest extends BaseTest {
 	
 	private static Integer MOV_ID;
 	
-	@Before
+	@BeforeClass // so fica BeforeClass pq alterei o token na ultima linha senão seria Before
 	
-	public void login () {
+	public static void login () {
 		
 		Map<String, String> login = new HashMap<>();
 		login.put("email", "paulo.nascimento@bs2.com.br");
 		login.put("senha", "123456");
 		
 	
-		TOKEN = given()
+		String TOKEN = given()
 			.body(login)
 		
 		.when()
@@ -47,7 +49,12 @@ public class BarrigaTest extends BaseTest {
 			.statusCode(200)
 			.extract().path("token"); 
 		
+		RestAssured.responseSpecification.header("Authorization", "JWT " + TOKEN); // essa configuraçao faz com que o token vá em todas as requisiçoes não necessitando passar no header
+		
 	}
+	
+	
+	
 	
 	
 	@Test
@@ -69,7 +76,6 @@ public class BarrigaTest extends BaseTest {
 	public void t02_deveIncluirContaComSucesso() {	
 		
 		CONTA_ID = given() //AQUI INSERO MINHA VARIAVEL CRIADA PARA POVOAR MEU ID
-		.header("Authorization", "JWT " + TOKEN)
 		  .body("{\"nome\": \""+CONTA_NAME+"\" }") //USAR O MAP
 		.when()
 			.post("/contas")
@@ -87,7 +93,6 @@ public class BarrigaTest extends BaseTest {
 	public void t03_deveAlterarContaComSucesso() {
 		
 		given()
-		.header("Authorization", "JWT " + TOKEN)
 		  .body("{\"nome\": \""+CONTA_NAME+"alterada\" }")
 		  .pathParam("id", "CONTA_ID") // aqui estou usando o id capturado na inserção
 		.when()
@@ -108,7 +113,6 @@ public class BarrigaTest extends BaseTest {
 	public void t04_naoDeveInserirContaMesmoNome() {
 		
 		given()
-		.header("Authorization", "JWT " + TOKEN)
 		  .body("{\"nome\": \""+CONTA_NAME+ "alterada\" }")
 		.when()
 			.post("/contas")
@@ -133,7 +137,6 @@ public class BarrigaTest extends BaseTest {
 		
 		
 		MOV_ID = given()
-		.header("Authorization", "JWT " + TOKEN)
 		  .body(mov)
 		.when()
 			.post("/transacoes")
@@ -153,7 +156,6 @@ public class BarrigaTest extends BaseTest {
 		
 		
 		given()
-		.header("Authorization", "JWT " + TOKEN)
 		  .body("{}")
 		.when()
 			.post("/transacoes")
@@ -186,7 +188,6 @@ public void t07_naoDeveInserirMovimentacaoDataFutura() {
 	
 	
 	given()
-	.header("Authorization", "JWT " + TOKEN)
 	  .body(mov)
 	.when()
 		.post("/transacoes")
@@ -217,7 +218,6 @@ public void t08_naoDeveRemoverContaComMovimentacao() {
 	
 	
 	given()
-	.header("Authorization", "JWT " + TOKEN)
 	.pathParam("id", CONTA_ID)
 	.when()
 		.delete("contas/{id}")
@@ -240,7 +240,6 @@ public void t09_deveCalcularSaldoContas() {
 	
 	
 	given()
-	.header("Authorization", "JWT " + TOKEN)
 	.when()
 		.get("/saldo")
 	.then()
@@ -260,7 +259,6 @@ public void t10_deveRemoverMovimentacao() {
 	
 	
 	given()
-	.header("Authorization", "JWT " + TOKEN)
 	.pathParam("id", MOV_ID)
 	.when()
 		.delete("/transacoes/{id}")
